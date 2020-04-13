@@ -41,8 +41,9 @@ from sklearn.metrics import (
     f1_score,
     precision_score,
     recall_score,
+    confusion_matrix,
 )
-from sklearn.model_selection import StratifiedKFold
+from sklearn.model_selection import StratifiedKFold, cross_val_score
 from sklearn.preprocessing import LabelEncoder
 from sklearn.tree import DecisionTreeClassifier
 
@@ -116,23 +117,12 @@ word_reps = {"tfidf": train_tfidf, "tf": train_tf, "bow": train_bow}
 
 
 def objective(args):
+    model_type = args.pop("model_type")
     words = word_reps[args.pop("word_rep")]
-    kfold = StratifiedKFold(n_splits=3, random_state=42, shuffle=True)
     model = model_type(**args)
-    f1_scores = []
-    for train_index, test_index in kfold.split(train_x, train_y):
-        model.fit(words[train_index], train_y.iloc[train_index])
 
-        f1_scores.append(
-            -f1_score(
-                train_y.iloc[test_index],
-                model.predict(words[test_index]),
-                average="weighted",
-            )
-        )
-
-    # TODO is f1 what we want to be minimising? Or should we a mean of metrics
-    return np.mean(f1_scores)
+    # TODO is f1 what we want to be minimising? Or should we use a mean of metrics
+    return -np.mean(cross_val_score(model, words, train_y, cv=3, scoring="f1_macro"))
 
 
 # Define a search space - Logistic regression so lets search for a value of C and which penalty to use.
