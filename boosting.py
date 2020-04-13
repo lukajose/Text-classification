@@ -195,7 +195,7 @@ space = {
     "learning_rate": hp.loguniform("learning_rate", 0, 1),
     "verbosity": 0,
     # "tree_method": "gpu_hist",
-    "gamma": hp.loguniform("gamma", 0, 1),
+    "gamma": hp.loguniform("gamma", 0, 2),
     "reg_alpha": hp.loguniform("reg_alpha", 0, 1),
     "reg_lambda": hp.loguniform("reg_lambda", 0, 1),
     "subsample": hp.uniform("subsample", 0, 1),
@@ -209,9 +209,9 @@ space = {
 }
 
 # minimize the objective over the space
-best = fmin(objective, space, algo=tpe.suggest, max_evals=100)
+best = fmin(objective, space, algo=tpe.suggest, max_evals=1000)
 print(hyperopt.space_eval(space, best))
-pd.DataFrame(best).to_csv("xgb_best.csv", index=False)
+pd.DataFrame(best, index=[0]).to_csv("xgb_best_macro.csv", index=False)
 
 # %%
 # Hard code best known params so far
