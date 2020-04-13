@@ -115,8 +115,9 @@ for topic in topics:
 
 
 # %%
-#evauating accuracy of lr for bag of words, tdif, and tdf
+#evauating accuracy of lr and mnb for bag of words, tdif, and tdf
 lr=LogisticRegression(multi_class='multinomial',solver='lbfgs',max_iter=1000,random_state=0)
+mnb = MultinomialNB()
 
 #TD-IF
 X = vectorizer.fit_transform(df['article_words'])	
@@ -127,6 +128,9 @@ y_test = df.iloc[9400:,2]
 s = cross_val_score(lr,X_train, y_train,cv=5)
 print("mean accuracy of lr using tdif {}".format(s.mean()))
 
+mnb_s = cross_val_score(mnb,X_train, y_train,cv=5)
+print("mean accuracy of mnb using tdif {}".format(mnb_s.mean()))
+
 #wihtout idf- td  is just adjusting weighting by length of document. 
 vectorizer2 = TfidfVectorizer(use_idf=False)
 X = vectorizer2.fit_transform(df['article_words'])	
@@ -136,6 +140,8 @@ X_test = X[9400:]
 s = cross_val_score(lr,X_train, y_train, cv=5)
 print("mean accuracy of lr using only td {}".format(s.mean()))
 
+mnb_s = cross_val_score(mnb,X_train, y_train,cv=5)
+print("mean accuracy of mnb using td {}".format(mnb_s.mean()))
 
 X = count.fit_transform(df['article_words'])	
 X_train = X[:9400]
@@ -143,6 +149,10 @@ X_test = X[9400:]
 
 s = cross_val_score(lr,X_train, y_train,cv=5)
 print("mean accuracy of lr using bag of words {}".format(s.mean()))
+
+mnb_s = cross_val_score(mnb,X_train, y_train,cv=5)
+print("mean accuracy of mnb using bag of words {}".format(mnb_s.mean()))
+
 lr.fit(X_train,y_train)
 
 
@@ -154,6 +164,7 @@ lr.fit(X_train,y_train)
 df = df.sample(frac=1).reset_index(drop=True)
 #changing class weights to address the imbalance in dataset
 lr=LogisticRegression(multi_class='multinomial',solver='lbfgs',class_weight='balanced',max_iter=1000,random_state=0)
+mnb = MultinomialNB()
 #lets see accuracy using a validation set
 print("bag of words")
 X = count.fit_transform(df['article_words'])	
@@ -163,8 +174,13 @@ y_train = df.iloc[:9000,2]
 y_test = df.iloc[9000:,2]
 lr.fit(X_train,y_train)
 predicted_y = lr.predict(X_test)
+print('logistic regresion')
 print(classification_report(y_test, predicted_y))
 
+mnb.fit(X_train,y_train)
+predicted_y = mnb.predict(X_test)
+print('multinomial naive bayes')
+print(classification_report(y_test, predicted_y))
 
 print("td")
 X = vectorizer2.fit_transform(df['article_words'])	
@@ -174,8 +190,13 @@ y_train = df.iloc[:9000,2]
 y_test = df.iloc[9000:,2]
 lr.fit(X_train,y_train)
 predicted_y = lr.predict(X_test)
+print('logistic regresion')
 print(classification_report(y_test, predicted_y))
 
+mnb.fit(X_train,y_train)
+predicted_y = mnb.predict(X_test)
+print('multinomial naive bayes')
+print(classification_report(y_test, predicted_y))
 
 print("TDIF")
 X = vectorizer.fit_transform(df['article_words'])	
@@ -185,6 +206,12 @@ y_train = df.iloc[:9000,2]
 y_test = df.iloc[9000:,2]
 lr.fit(X_train,y_train)
 predicted_y = lr.predict(X_test)
+print('logistic regresion')
+print(classification_report(y_test, predicted_y))
+
+mnb.fit(X_train,y_train)
+predicted_y = mnb.predict(X_test)
+print('multinomial naive bayes')
 print(classification_report(y_test, predicted_y))
 
 # %% [markdown]
