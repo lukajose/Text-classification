@@ -22,10 +22,12 @@
 # %%
 # Importing Libraries
 import hyperopt
+import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
+from catboost import CatBoostClassifier
 from hyperopt import fmin, hp, space_eval, tpe
 from scipy.sparse import csr_matrix
 from sklearn.ensemble import (
@@ -33,22 +35,25 @@ from sklearn.ensemble import (
     GradientBoostingClassifier,
     RandomForestClassifier,
 )
-from sklearn.tree import DecisionTreeClassifier
 from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
 from sklearn.metrics import (
     accuracy_score,
     classification_report,
+    confusion_matrix,
     f1_score,
+    make_scorer,
+    plot_confusion_matrix,
     precision_score,
     recall_score,
-    confusion_matrix,
 )
 from sklearn.model_selection import StratifiedKFold, cross_val_score
-from sklearn.utils.class_weight import compute_class_weight
 from sklearn.preprocessing import LabelEncoder
-from sklearn.ensemble import GradientBoostingClassifier, AdaBoostClassifier
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.utils.class_weight import compute_class_weight
 from xgboost import XGBClassifier
-from catboost import CatBoostClassifier
+
+# Change default plot size
+matplotlib.rcParams["figure.figsize"] = (12, 8)
 
 # Setting random seed
 np.random.seed(42)
@@ -108,6 +113,55 @@ model.fit(train_bow, train_y)
 model.score(test_bow, test_y)
 
 # %% [markdown]
+# ## Metrics
+# Here we define a custom metric that only accounts for precision among the top 10 predicted instances. Refer to docstring for more information
+
+# %%
+def precision10(y_true: pd.Series, y_pred: np.array) -> float:
+    """Calculates the precision for each class over the top 10 predicted elements.
+
+    For each class we find the predictions with the top 10 largest probabilities. If a class
+    has fewer than 10 predictions than all predictions are considered. The precision is then
+    calculated for these recommendations for each class. A simple average of each class's
+    precision is returned 
+    
+    Args:
+        y_true: The true class labels for each sample
+        y_pred: The predicted probabilities for each sample
+    
+    Returns:
+        float: The average precision on the top 10 or fewer predictions
+    """
+    y_true = pd.DataFrame(y_true.values, columns=["labels"])
+    y_pred = pd.DataFrame(y_pred)
+    results = y_true.join(y_pred)
+
+    precisions = []
+    for category in results.drop("labels", axis=1).columns:
+        # Sort by predicted probability for each class
+        results = results.sort_values(by=category, ignore_index=True, ascending=False)
+        probabilities = results.drop("labels", axis=1)
+
+        # `recommendations` is all the elements where the given class is predicted
+        # If there are more than ten, just take the 10 with highest predicted probability
+        recommendations = results[probabilities[category] == probabilities.max(axis=1)]
+        if (len(recommendations)) > 10:
+            recommendations = recommendations.head(10)
+
+        # Calculate the predicted score for these predictions
+        precisions.append(
+            precision_score(
+                (recommendations.labels == category).astype(int),
+                y_pred=np.ones(recommendations.labels.shape),
+            )
+        )
+
+    return np.mean(precisions)
+
+
+precision10_score = make_scorer(precision10, needs_proba=True)
+
+# %% [markdown]
 # ## Hyper Parameter Optimisation
 # This step is optional, but will use Bayesian optimisation to find the best hyperparameters in the search space. This is done using the [hyperopt](https://github.com/hyperopt/hyperopt) package. The algorithm searches the hyperparameter space by minimising the f1 score across many trials. The larger the `max_evals` parameter, the higher the likelihood of obtaining the optimal hyperparameters (should be >1000 ideally). Note: HPO can take a significant amount of time.
 #
@@ -125,12 +179,11 @@ def objective(args):
     words = word_reps[args.pop("word_rep")]
     model = model_type(**args)
 
-    # TODO is f1 what we want to be minimising? Or should we use a mean of metrics
-    return -np.mean(cross_val_score(model, words, train_y, cv=3, scoring="f1_macro"))
+    return -np.mean(
+        cross_val_score(model, words, train_y, cv=3, scoring=precision10_score)
+    )
 
 
-# Define a search space - Logistic regression so lets search for a value of C and which penalty to use.
-# For full list of configuration options see http://hyperopt.github.io/hyperopt/getting-started/search_spaces/
 # space = hp.choice(
 #     "classifier_type",
 #     [
@@ -209,27 +262,26 @@ space = {
 }
 
 # minimize the objective over the space
-best = fmin(objective, space, algo=tpe.suggest, max_evals=1000)
+best = fmin(objective, space, algo=tpe.suggest, max_evals=100)
 print(hyperopt.space_eval(space, best))
-pd.DataFrame(best, index=[0]).to_csv("xgb_best_macro.csv", index=False)
+pd.DataFrame(best, index=[0]).to_csv("xgb_pr10.csv", index=False)
 
 # %%
-# Hard code best known params so far
-params = {
-    "colsample_bylevel": 0.6563788986970766,
-    "colsample_bynode": 0.9136356080679319,
-    "colsample_bytree": 0.8911958246194586,
-    "gamma": 1.9481189927597262,
-    "learning_rate": 1.1448899886716173,
-    "max_depth": 1,
-    "min_child_weight": 16,
-    "n_estimators": 341,
-    "reg_alpha": 1.4734361325035565,
-    "reg_lambda": 1.0527799676313565,
-    "subsample": 0.9277895517416914,
-    "word_rep": "tfidf",
-    "verbosity": 0,
-    "scale_pos_weight": train_weights,
+# Hard code best known params so far and load if no HPO
+# best = pd.read_csv("xgb_best_pr_macro").to_dict()
+best = {
+    "colsample_bylevel": 0.4311244308631876,
+    "colsample_bynode": 0.4883649316341705,
+    "colsample_bytree": 0.2188455278994769,
+    "gamma": 1.7012247488947432,
+    "learning_rate": 1.1136910835752074,
+    "max_depth": 0,
+    "min_child_weight": 0,
+    "n_estimators": 271,
+    "reg_alpha": 2.132610221304731,
+    "reg_lambda": 1.8979000825560892,
+    "subsample": 0.6462993422098632,
+    "word_rep": 1,
 }
 
 # %% [markdown]
@@ -237,12 +289,12 @@ params = {
 # Evaluate the models by the metrics given in the example piece of code.
 
 # %%
-# Create model with best hyperparameters seen above.
+# Create model with best hyperparameters seen above. Need to manually select hyperparameters
 
 args = hyperopt.space_eval(space, best)
 model_type = args.pop("model_type")
 words = word_reps[args.pop("word_rep")]
-test_words = test_tfidf
+test_words = test_tf
 
 model = model_type(**args)
 model.fit(words, train_y)
@@ -252,8 +304,15 @@ print(
 
 
 # %%
-plt.figure(figsize=(8, 8))
-sns.heatmap(confusion_matrix(test_y, model.predict(test_words)))
+plot_confusion_matrix(
+    model,
+    test_tf,
+    test_y,
+    normalize="pred",
+    cmap="Blues",
+    display_labels=le.classes_,
+    xticks_rotation=75,
+)
 
 
 # %%

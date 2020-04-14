@@ -22,6 +22,7 @@
 # %%
 # Importing Libraries
 import hyperopt
+import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -34,18 +35,22 @@ from sklearn.ensemble import (
     RandomForestClassifier,
 )
 from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
-from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import (
     accuracy_score,
     classification_report,
+    confusion_matrix,
     f1_score,
+    make_scorer,
+    plot_confusion_matrix,
     precision_score,
     recall_score,
-    confusion_matrix,
 )
 from sklearn.model_selection import StratifiedKFold, cross_val_score
 from sklearn.preprocessing import LabelEncoder
-from sklearn.tree import DecisionTreeClassifier
+from sklearn.linear_model import LogisticRegression
+
+# Change default plot size
+matplotlib.rcParams["figure.figsize"] = (12, 8)
 
 # Setting random seed
 np.random.seed(42)
@@ -105,6 +110,54 @@ model.fit(train_bow, train_y)
 model.score(test_bow, test_y)
 
 # %% [markdown]
+# ## Metrics
+# Here we define a custom metric that only accounts for precision among the top 10 predicted instances. Refer to docstring for more information
+
+# %%
+def precision10(y_true: pd.Series, y_pred: np.array) -> float:
+    """Calculates the precision for each class over the top 10 predicted elements.
+
+    For each class we find the predictions with the top 10 largest probabilities. If a class
+    has fewer than 10 predictions than all predictions are considered. The precision is then
+    calculated for these recommendations for each class. A simple average of each class's
+    precision is returned 
+    
+    Args:
+        y_true: The true class labels for each sample
+        y_pred: The predicted probabilities for each sample
+    
+    Returns:
+        float: The average precision on the top 10 or fewer predictions
+    """
+    y_true = pd.DataFrame(y_true.values, columns=["labels"])
+    y_pred = pd.DataFrame(y_pred)
+    results = y_true.join(y_pred)
+
+    precisions = []
+    for category in results.drop("labels", axis=1).columns:
+        # Sort by predicted probability for each class
+        results = results.sort_values(by=category, ignore_index=True, ascending=False)
+        probabilities = results.drop("labels", axis=1)
+
+        # `recommendations` is all the elements where the given class is predicted
+        # If there are more than ten, just take the 10 with highest predicted probability
+        recommendations = results[probabilities[category] == probabilities.max(axis=1)]
+        if (len(recommendations)) > 10:
+            recommendations = recommendations.head(10)
+
+        # Calculate the predicted score for these predictions
+        precisions.append(
+            precision_score(
+                (recommendations.labels == category).astype(int),
+                y_pred=np.ones(recommendations.labels.shape),
+            )
+        )
+
+    return np.mean(precisions)
+
+
+precision10_score = make_scorer(precision10, needs_proba=True)
+# %% [markdown]
 # ## Hyper Parameter Optimisation
 # This step is optional, but will use Bayesian optimisation to find the best hyperparameters in the search space. This is done using the [hyperopt](https://github.com/hyperopt/hyperopt) package. The algorithm searches the hyperparameter space by minimising the f1 score across many trials. The larger the `max_evals` parameter, the higher the likelihood of obtaining the optimal hyperparameters (should be >1000 ideally). Note: HPO can take a significant amount of time.
 #
@@ -121,7 +174,6 @@ def objective(args):
     words = word_reps[args.pop("word_rep")]
     model = model_type(**args)
 
-    # TODO is f1 what we want to be minimising? Or should we use a mean of metrics
     return -np.mean(cross_val_score(model, words, train_y, cv=3, scoring="f1_macro"))
 
 
@@ -156,3 +208,12 @@ print(
 
 
 # %%
+plot_confusion_matrix(
+    model,
+    test_bow,
+    test_y,
+    normalize="true",
+    cmap="Blues",
+    display_labels=le.classes_,
+    xticks_rotation="vertical",
+)
