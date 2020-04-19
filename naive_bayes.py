@@ -195,7 +195,7 @@ args = hyperopt.space_eval(space, best)
 words = word_reps[args.pop("word_rep")]
 test_words = test_tfidf
 
-model = MultinomialNB()
+model = MultinomialNB(**args)
 model.fit(words, train_y)
 print(
     classification_report(test_y, model.predict(test_words), target_names=le.classes_)
