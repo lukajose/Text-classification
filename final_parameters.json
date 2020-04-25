@@ -1,0 +1,30 @@
+{
+  "xgb_params": {
+    "colsample_bylevel": 0.23622162220801438,
+    "colsample_bynode": 0.8307806359148127,
+    "colsample_bytree": 0.9198146089005393,
+    "gamma": 2.1352409910294248,
+    "learning_rate": 1.079282133086003,
+    "max_depth": 19,
+    "min_child_weight": 11,
+    "n_estimators": 173,
+    "objective": "multi:softprob",
+    "random_state": 42,
+    "reg_alpha": 2.1222376392788243,
+    "reg_lambda": 1.772086823677413,
+    "subsample": 0.8677436954400013,
+    "verbosity": 0
+  },
+  "tfidf_params": {
+    "max_df": 0.9671736143714194,
+    "max_features": 500,
+    "min_df": 0.00020738898925794447
+  },
+  "lr_params": {
+    "C": 16,
+    "class_weight": "balanced",
+    "penalty": "l2",
+    "max_iter": 700,
+    "random_state": 42
+  }
+}
