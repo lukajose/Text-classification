@@ -94,10 +94,18 @@ lr = LogisticRegression(**params["lr_params"]).fit(train_words, train_y)
 feature_to_words = dict((value, key) for key, value in tfidf.vocabulary_.items())
 
 #%%
-# XGBoost top 10 features
+# XGBoost top `num_features` features
+num_features = 20
 plt.bar(
-    np.flip([feature_to_words[x] for x in np.argsort(xgb.feature_importances_)[-20:]]),
-    np.flip(xgb.feature_importances_[np.argsort(xgb.feature_importances_)[-20:]]),
+    np.flip(
+        [
+            feature_to_words[x]
+            for x in np.argsort(xgb.feature_importances_)[-num_features:]
+        ]
+    ),
+    np.flip(
+        xgb.feature_importances_[np.argsort(xgb.feature_importances_)[-num_features:]]
+    ),
 )
 plt.xticks(rotation=45)
 plt.xlabel("Words")
@@ -112,8 +120,8 @@ classes.remove("IRRELEVANT")
 for topic, i in zip(classes, range(len(classes))):
     plt.subplot(4, 3, i + 1)
     plt.bar(
-        np.flip([feature_to_words[x] for x in np.argsort(lr.coef_[i])[-20:]]),
-        np.flip(lr.coef_[i][np.argsort(lr.coef_[i])[-20:]]),
+        np.flip([feature_to_words[x] for x in np.argsort(lr.coef_[i])[-num_features:]]),
+        np.flip(lr.coef_[i][np.argsort(lr.coef_[i])[-num_features:]]),
     )
     plt.xticks(rotation=75)
     plt.ylabel("Importance Weight")
