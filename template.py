@@ -45,7 +45,7 @@ from sklearn.metrics import (
     precision_score,
     recall_score,
 )
-from sklearn.model_selection import StratifiedKFold, cross_val_score
+from sklearn.model_selection import StratifiedKFold, cross_val_score, cross_validate
 from sklearn.preprocessing import LabelEncoder
 from sklearn.linear_model import LogisticRegression
 
@@ -110,59 +110,10 @@ model.fit(train_bow, train_y)
 model.score(test_bow, test_y)
 
 # %% [markdown]
-# ## Metrics
-# Here we define a custom metric that only accounts for precision among the top 10 predicted instances. Refer to docstring for more information
-
-# %%
-def precision10(y_true: pd.Series, y_pred: np.array) -> float:
-    """Calculates the precision for each class over the top 10 predicted elements.
-
-    For each class we find the predictions with the top 10 largest probabilities. If a class
-    has fewer than 10 predictions than all predictions are considered. The precision is then
-    calculated for these recommendations for each class. A simple average of each class's
-    precision is returned 
-    
-    Args:
-        y_true: The true class labels for each sample
-        y_pred: The predicted probabilities for each sample
-    
-    Returns:
-        float: The average precision on the top 10 or fewer predictions
-    """
-    y_true = pd.DataFrame(y_true.values, columns=["labels"])
-    y_pred = pd.DataFrame(y_pred)
-    results = y_true.join(y_pred)
-
-    precisions = []
-    for category in results.drop("labels", axis=1).columns:
-        # Sort by predicted probability for each class
-        results = results.sort_values(by=category, ignore_index=True, ascending=False)
-        probabilities = results.drop("labels", axis=1)
-
-        # `recommendations` is all the elements where the given class is predicted
-        # If there are more than ten, just take the 10 with highest predicted probability
-        recommendations = results[probabilities[category] == probabilities.max(axis=1)]
-        if (len(recommendations)) > 10:
-            recommendations = recommendations.head(10)
-
-        # Calculate the predicted score for these predictions
-        precisions.append(
-            precision_score(
-                (recommendations.labels == category).astype(int),
-                y_pred=np.ones(recommendations.labels.shape),
-            )
-        )
-
-    return np.mean(precisions)
-
-
-precision10_score = make_scorer(precision10, needs_proba=True)
-# %% [markdown]
 # ## Hyper Parameter Optimisation
 # This step is optional, but will use Bayesian optimisation to find the best hyperparameters in the search space. This is done using the [hyperopt](https://github.com/hyperopt/hyperopt) package. The algorithm searches the hyperparameter space by minimising the f1 score across many trials. The larger the `max_evals` parameter, the higher the likelihood of obtaining the optimal hyperparameters (should be >1000 ideally). Note: HPO can take a significant amount of time.
 #
 # If you are using an sklearn model, consider the package [hyperopt-sklearn](https://github.com/hyperopt/hyperopt-sklearn) which will automatically search over the supported hyperparameters of the model. This isn't used in this example however.
-
 
 # %%
 model_type = LogisticRegression
@@ -186,34 +137,64 @@ space = {
 }
 
 # minimize the objective over the space
-best = fmin(objective, space, algo=tpe.suggest, max_evals=10)
+best = fmin(objective, space, algo=tpe.suggest, max_evals=5000)
 print(hyperopt.space_eval(space, best))
 
-# %% [markdown]
-# ## Evaluation
-# Evaluate the models by the metrics given in the example piece of code.
-
 # %%
-# Create model with best hyperparameters seen above. Need to manually select which word rep to use
+# Create model with best hyperparameters seen above. Need to manually select test representation
 
 args = hyperopt.space_eval(space, best)
-words = word_reps[args.pop("word_rep")]
+train_words = word_reps[args.pop("word_rep")]
 test_words = test_tfidf
 
 model = model_type(**args)
-model.fit(words, train_y)
+
+# Fit to training data
+model.fit(train_words, train_y)
+
+# Print metrics
 print(
-    classification_report(test_y, model.predict(test_words), target_names=le.classes_)
+    "Test",
+    classification_report(test_y, model.predict(test_words), target_names=le.classes_),
 )
 
+# Get training metrics
+train_scores = cross_validate(
+    model,
+    train_words,
+    train_y,
+    cv=5,
+    scoring=["precision_macro", "recall_macro", "f1_macro"],
+)
+print("Precision", np.mean(train_scores["test_precision_macro"]))
+print("Recall", np.mean(train_scores["test_recall_macro"]))
+print("f1", np.mean(train_scores["test_f1_macro"]))
 
 # %%
+# Investigate confusion matrices
 plot_confusion_matrix(
     model,
-    test_bow,
+    test_words,
+    test_y,
+    normalize="pred",
+    cmap="Blues",
+    display_labels=le.classes_,
+    xticks_rotation=75,
+)
+plot_confusion_matrix(
+    model,
+    test_words,
     test_y,
     normalize="true",
     cmap="Blues",
     display_labels=le.classes_,
-    xticks_rotation="vertical",
+    xticks_rotation=75,
+)
+plot_confusion_matrix(
+    model,
+    test_words,
+    test_y,
+    cmap="Blues",
+    display_labels=le.classes_,
+    xticks_rotation=75,
 )
