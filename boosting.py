@@ -18,7 +18,6 @@
 # %% [markdown]
 # ## Setup
 
-
 # %%
 # Importing Libraries
 import hyperopt
@@ -79,10 +78,6 @@ test_y = test["label"]
 # ## Word Representation + Additional Processing
 # Here we select how the words will be converted into input for the model. E.g. bag of words, word2vec, TF-IDF etc.
 # If you would like to any additional preprocessing, this is the place to do it as well.
-
-# %%
-# Additional preprocessing (none for this example)
-
 
 # %%
 # Create 3 representations for the documents: Bag of Words, TF, TF-IDF.
@@ -168,9 +163,11 @@ space = hp.choice(
 
 
 # minimize the objective over the space
-best = fmin(objective, space, algo=tpe.suggest, max_evals=100)
+best = fmin(objective, space, algo=tpe.suggest, max_evals=5000)
 print(hyperopt.space_eval(space, best))
-# pd.DataFrame(best, index=[0]).to_csv("hp/rough_hpo.csv", index=False)
+
+# Optionally save hyperparams
+# pd.DataFrame(best, index=[0]).to_csv("rough_hpo.csv", index=False)
 
 # %% [markdown]
 # ## In Depth Hyper Parameter Optimisation
@@ -182,7 +179,6 @@ train_weights = class_weights[train_y]
 
 
 def objective(args):
-
     tfidf = TfidfVectorizer(**args["tfidf_params"])
     try:
         tfidf = tfidf.fit(train_x.article_words)
@@ -216,69 +212,42 @@ space = {
         "max_df": hp.uniform("max_df", 0.5, 1),
         "min_df": hp.uniform("min_df", 0, 0.5),
         # "ngram_range": (1, hp.choice("ngram_range", np.arange(1,5))),
-        "max_features": hp.choice(
-            "max_features", list(np.arange(100, 1000, 50)) + [None]
-        ),
+        "max_features": 500,
     },
 }
 
 # minimize the objective over the space
-best = fmin(objective, space, algo=tpe.suggest, max_evals=2000)
+best = fmin(objective, space, algo=tpe.suggest, max_evals=5000)
 print(hyperopt.space_eval(space, best))
-pd.DataFrame(best, index=[0]).to_csv("hp/xgb_f1macro_thorough.csv", index=False)
 
-# %%
-# Hard code best known params so far and load if no HPO
-# space = {
-#     "model_type": XGBClassifier,
-#     "objective": "multi:softprob",
-#     "n_estimators": hp.choice("n_estimators", np.arange(1, 500, dtype=int)),
-#     "max_depth": hp.choice("max_depth", np.arange(1, 20, dtype=int)),
-#     "learning_rate": hp.loguniform("learning_rate", 0, 1),
-#     "verbosity": 0,
-#     # "tree_method": "gpu_hist",
-#     "gamma": hp.loguniform("gamma", 0, 2),
-#     "reg_alpha": hp.loguniform("reg_alpha", 0, 1),
-#     "reg_lambda": hp.loguniform("reg_lambda", 0, 1),
-#     "subsample": hp.uniform("subsample", 0, 1),
-#     "random_state": 42,
-#     "word_rep": hp.choice("word_rep", ["tfidf", "tf", "bow"]),
-#     "scale_pos_weight": train_weights,
-#     "colsample_bytree": hp.uniform("colsample_bytree", 0, 1),
-#     "colsample_bylevel": hp.uniform("colsample_bylevel", 0, 1),
-#     "colsample_bynode": hp.uniform("colsample_bynode", 0, 1),
-#     "min_child_weight": hp.choice("min_child_weight", np.arange(1, 50,)),
-# }
-# best = pd.read_csv("hp/xgb_f1_macro.csv").iloc[0].to_dict()
-print(hyperopt.space_eval(space, best))
+# Optionally save best hyperparamers
+# pd.DataFrame(best, index=[0]).to_csv("hp/xgb_f1macro_thorough.csv", index=False)
 
 # %% [markdown]
 # ## Evaluation
 # Evaluate the models by the metrics given in the example piece of code.
 
 # %%
-# Create model with best hyperparameters seen above. Need to manually select hyperparameters
-
+# Load up best hyperparameters
 args = hyperopt.space_eval(space, best)
-# model_type = args.pop("model_type")
-# words = word_reps[args.pop("word_rep")]
-# test_words = test_tfidf
-# train_words = train_tfidf
 
 # %%
-# Compute metrics
+# Initialise optimal model
 model = XGBClassifier(**args["model_params"])
 tfidf = TfidfVectorizer(**args["tfidf_params"]).fit(train_x.article_words)
 train_words = tfidf.transform(train_x.article_words)
 test_words = tfidf.transform(test_x.article_words)
 
+# Fit to training data
 model.fit(train_words, train_y)
+
+# Print metrics
 print(
     "Test",
     classification_report(test_y, model.predict(test_words), target_names=le.classes_),
 )
 
-# Get test
+# Get training metrics
 train_scores = cross_validate(
     model,
     train_words,
@@ -291,6 +260,7 @@ print("Recall", np.mean(train_scores["test_recall_macro"]))
 print("f1", np.mean(train_scores["test_f1_macro"]))
 
 # %%
+# Investigate confusion matrices
 plot_confusion_matrix(
     model,
     test_words,
@@ -317,12 +287,3 @@ plot_confusion_matrix(
     display_labels=le.classes_,
     xticks_rotation=75,
 )
-
-# %%
-import json
-
-args["model_params"]["scale_pos_weight"] = "GET ME"
-with open("hp/thorough.json", "w") as f:
-    json.dump(args, f)
-
-# %%
