@@ -95,7 +95,7 @@ feature_to_words = dict((value, key) for key, value in tfidf.vocabulary_.items()
 
 #%%
 # XGBoost top `num_features` features
-num_features = 20
+num_features = 10
 plt.bar(
     np.flip(
         [
@@ -109,12 +109,12 @@ plt.bar(
 )
 plt.xticks(rotation=45)
 plt.xlabel("Words")
-plt.ylabel("Importance Weight")
+plt.ylabel("Weight")
 plt.title("Top 20 features for XGBoost")
 plt.savefig("xgboost_feature_importance.png", dpi=600, bbox_inces="tight")
 # %%
 # Logistic regression gives us top features by class
-plt.figure(figsize=(30, 25))
+plt.figure(figsize=(30, 22))
 classes = le.classes_.tolist()
 classes.remove("IRRELEVANT")
 for topic, i in zip(classes, range(len(classes))):
@@ -124,8 +124,8 @@ for topic, i in zip(classes, range(len(classes))):
         np.flip(lr.coef_[i][np.argsort(lr.coef_[i])[-num_features:]]),
     )
     plt.xticks(rotation=75)
-    plt.ylabel("Importance Weight")
+    plt.ylabel("Weight")
     plt.title(f"{topic}")
 plt.subplots_adjust(hspace=0.3)
-plt.savefig("lr_feature_importance.png", dpi=300, bbox_inces="tight")
+plt.savefig("lr_feature_importance.png", dpi=600, bbox_inces="tight")
 # %%

@@ -11,14 +11,6 @@
 #     language: python
 #     name: python3
 # ---
-
-# %% [markdown]
-# # Text Classification
-
-# %% [markdown]
-# ## Setup
-
-
 # %%
 # Importing Libraries
 import json
@@ -182,6 +174,3 @@ results = getArticles(test_y, model.predict_proba(test_words))
 print(results)
 with open("final_results.json", "w") as f:
     json.dump(results, f)
-
-
-# %%
