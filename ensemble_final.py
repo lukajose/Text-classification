@@ -142,9 +142,7 @@ def getArticles(y_true: pd.Series, y_pred: np.array):
             recommendations = recommendations.head(10)
 
         category_recs = []
-        category_recs.append(
-            sorted(recommendations.index.values.tolist()))
-        )
+        category_recs.append(sorted(recommendations.index.values.tolist()))
 
         # Calculate the predicted score for these predictions
         category_recs.append(
