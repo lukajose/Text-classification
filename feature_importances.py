@@ -46,7 +46,7 @@ from xgboost import XGBClassifier
 
 # Change default plot size
 matplotlib.rcParams["figure.figsize"] = (12, 6)
-
+sns.set()
 # Setting random seed
 np.random.seed(42)
 
@@ -85,17 +85,19 @@ class_weights = compute_class_weight("balanced", np.unique(train_y), train_y)
 train_weights = class_weights[train_y]
 
 # Initialise models with optimal params. XGBoost needs to be calibrated before it can be ensembled
-xgb = XGBClassifier(scale_pos_weight=train_weights, **params["xgb_params"])
+xgb = XGBClassifier(scale_pos_weight=train_weights, **params["xgb_params"]).fit(
+    train_words, train_y
+)
 lr = LogisticRegression(**params["lr_params"]).fit(train_words, train_y)
 
 # %%
 # Explore feature importance of individual models
 # Get mapping of feature index to word.
 feature_to_words = dict((value, key) for key, value in tfidf.vocabulary_.items())
+num_features = 10
 
 #%%
 # XGBoost top `num_features` features
-num_features = 10
 plt.bar(
     np.flip(
         [
@@ -111,7 +113,7 @@ plt.xticks(rotation=45)
 plt.xlabel("Words")
 plt.ylabel("Weight")
 plt.title("Top 20 features for XGBoost")
-plt.savefig("xgboost_feature_importance.png", dpi=600, bbox_inces="tight")
+plt.savefig("xgboost_feature_importance.png", dpi=300, bbox_inches="tight")
 # %%
 # Logistic regression gives us top features by class
 plt.figure(figsize=(30, 22))
@@ -127,5 +129,5 @@ for topic, i in zip(classes, range(len(classes))):
     plt.ylabel("Weight")
     plt.title(f"{topic}")
 plt.subplots_adjust(hspace=0.3)
-plt.savefig("lr_feature_importance.png", dpi=600, bbox_inces="tight")
+plt.savefig("lr_feature_importance.png", bbox_inches="tight", dpi=300)
 # %%
