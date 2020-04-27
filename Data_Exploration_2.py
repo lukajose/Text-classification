@@ -7,9 +7,9 @@
 #       format_version: '1.5'
 #       jupytext_version: 1.4.2
 #   kernelspec:
-#     display_name: 'Python 3.6.5 64-bit (''Jose Ca'': virtualenv)'
+#     display_name: Python 3
 #     language: python
-#     name: python36564bitjosecavirtualenvd7d530439b5748e4aeb4afcd92dcbe4b
+#     name: python3
 # ---
 
 import matplotlib.pyplot as plt
@@ -43,6 +43,25 @@ plt.legend()
 train['topic'].value_counts().plot(kind='barh',color='green') # distribution of classes
 
 
+# News article length per topic
+
+# +
+
+def fn(entry):
+    return len(entry.split(","))
+df=train
+df['article_words'] = df['article_words'].astype(str)
+df['Article_length'] = df['article_words'].apply(fn)
+#print(df['Article_length'])
+
+plt.figure(figsize=(15,8))
+chart=sns.boxplot(data=df, x='topic', y='Article_length',color="#3498db")
+chart.set_xticklabels(chart.get_xticklabels(), rotation=45, horizontalalignment='right')
+plt.xlabel("Topics")
+plt.ylabel("Article length (number of words)")
+
+# -
+
 # ## Word Vectorizer
 # Looking for patterns in data
 
@@ -57,6 +76,8 @@ def get_word_frequency(corpus):
 word_freq = get_word_frequency(train[train['topic']  == "IRRELEVANT"]['article_words'])
 df1 = pd.DataFrame(word_freq, columns = ['ReviewText' , 'count'])
 df1.head(5)
+
+
 
 # ## Checking number of words
 # This section plots the distribution of number of words per category
