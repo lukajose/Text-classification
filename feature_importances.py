@@ -84,7 +84,7 @@ test_words = csr_matrix.toarray(tfidf.transform(test_x.article_words))
 class_weights = compute_class_weight("balanced", np.unique(train_y), train_y)
 train_weights = class_weights[train_y]
 
-# Initialise models with optimal params. XGBoost needs to be calibrated before it can be ensembled
+# Initialise models with optimal params
 xgb = XGBClassifier(scale_pos_weight=train_weights, **params["xgb_params"]).fit(
     train_words, train_y
 )
@@ -125,7 +125,7 @@ for topic, i in zip(classes, range(len(classes))):
         np.flip([feature_to_words[x] for x in np.argsort(lr.coef_[i])[-num_features:]]),
         np.flip(lr.coef_[i][np.argsort(lr.coef_[i])[-num_features:]]),
     )
-    plt.xticks(rotation=75)
+    plt.xticks(rotation=75, fontsize=15)
     plt.ylabel("Weight")
     plt.title(f"{topic}")
 plt.subplots_adjust(hspace=0.3)
